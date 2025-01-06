@@ -31,21 +31,22 @@ func main() {
 
 		switch cmd {
 		case "exit":
-			// fmt.Fprintf(os.Stdout, "..................%s\n", cmd)
 			os.Exit(0)
 			if !argsFound {
-				// fmt.Println("................... no args found")
 				cleanArgs = "1"
 				fmt.Fprintln(os.Stderr, "Error: No exit code provided. Using default exit code 1")
 			}
 			exitCommand(cleanArgs)
 		case "echo":
-			// fmt.Fprintf(os.Stdout, "..................%s\n", cmd)
-
 			if !argsFound {
 				cleanArgs = ""
 			}
 			echoCommand(cleanArgs)
+		case "type":
+			if !argsFound {
+				cleanArgs = ""
+			}
+			typeCommand(cleanArgs)
 		default:
 			fmt.Fprintln(os.Stderr, cmd+": command not found")
 		}
@@ -54,17 +55,34 @@ func main() {
 
 func exitCommand(args string) {
 	exitCode, err := strconv.Atoi(args)
-	// fmt.Printf("........................err: %s", err)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: invalid syntax. Using default exit code 1")
 		exitCode = 1
 	}
-	// fmt.Fprintf(os.Stdout, "Exiting with code %d", exitCode)
-	// fmt.Fprint(os.Stdout, "$ ")
 	os.Exit(exitCode)
 }
 
 func echoCommand(args string) {
-	echoString := strings.TrimSpace(args)
-	fmt.Fprintln(os.Stdout, echoString)
+	fmt.Fprintln(os.Stdout, args)
+}
+
+func typeCommand(args string) {
+	commandTypes := map[string]string{
+		"echo": "builtin",
+		"exit": "builtin",
+		"type": "builtin",
+	}
+
+	inputType, exists := commandTypes[args]
+	var inputDescription string
+
+	if exists {
+		switch inputType {
+		case "builtin":
+			inputDescription = " is a shell builtin"
+		}
+	} else {
+		inputDescription = ": not found"
+	}
+	fmt.Fprintf(os.Stdout, "%s%s\n", args, inputDescription)
 }
