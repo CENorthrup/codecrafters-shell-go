@@ -31,18 +31,26 @@ func main() {
 			args = inputParts[1:]
 		}
 
-		if cmd == "exit" {
-			code := 1
-			if len(args) > 0 {
-				code, err = strconv.Atoi(args[0])
-				if err != nil {
-					fmt.Fprintln(os.Stderr, "Error parsing exit code: invalid syntax. Using default exit code 1")
-				}
-			} else {
-				fmt.Fprintln(os.Stderr, "Error parsing exit code: no code provided. Using default exit code 1")
+		switch cmd {
+		case "exit":
+			if len(args) == 0 {
+				args[0] = "1"
+				fmt.Fprintln(os.Stderr, "Error: No exit code provided. Using default exit code 1")
 			}
-			os.Exit(code)
+			exitCommand(args)
+
+		default:
+			fmt.Fprintln(os.Stderr, cmd+": command not found")
 		}
-		fmt.Fprintln(os.Stderr, cmd+": command not found")
 	}
+}
+
+func exitCommand(args []string) {
+	code, err := strconv.Atoi(args[0])
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "Error: invalid syntax. Using default exit code 1")
+		code = 1
+	}
+	fmt.Fprintf(os.Stdout, "Exiting with code %d", code)
+	os.Exit(code)
 }
