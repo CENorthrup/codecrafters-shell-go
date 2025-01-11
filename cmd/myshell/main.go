@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -15,49 +16,54 @@ func main() {
 		fmt.Fprint(os.Stdout, "$ ")
 		input, err := reader.ReadString('\n')
 		if err != nil {
-			fmt.Fprintln(os.Stderr, "Error reading input:", err)
-			exitCommand("0")
+			fmt.Fprintf(os.Stderr, "Error: Unable to read input:%v\n", err)
+			exitCommand(1)
 		}
-
 		input = strings.TrimSpace(input)
-		inputParts := strings.Fields(input)
-		if len(inputParts) == 0 {
+		if input == "" {
 			continue
 		}
 
-		cmd := inputParts[0]
-		rawArgs, argsFound := strings.CutPrefix(input, cmd)
-		cleanArgs := strings.TrimSpace(rawArgs)
+		cmd, args, argsExist := parseInput(input)
 
 		switch cmd {
 		case "exit":
-			os.Exit(0)
-			if !argsFound {
-				cleanArgs = "1"
-				fmt.Fprintln(os.Stderr, "Error: No exit code provided. Using default exit code 1")
+			if argsExist {
+				exitCommand(args)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: No exit code provided. Using default exit code 1\n")
+				exitCommand(1)
 			}
-			exitCommand(cleanArgs)
 		case "echo":
-			if !argsFound {
-				cleanArgs = ""
-			}
-			echoCommand(cleanArgs)
+			echoCommand(args)
 		case "type":
-			if !argsFound {
-				cleanArgs = ""
-			}
-			typeCommand(cleanArgs)
+			typeCommand(args)
 		default:
-			fmt.Fprintln(os.Stderr, cmd+": command not found")
+			fmt.Fprintf(os.Stderr, "%s: command not found\n", cmd)
 		}
 	}
 }
 
-func exitCommand(args string) {
-	exitCode, err := strconv.Atoi(args)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "Error: invalid syntax. Using default exit code 1")
-		exitCode = 1
+func parseInput(input string) (cmd string, args string, argsExist bool) {
+	inputParts := strings.Fields(input)
+	cmd = inputParts[0]
+	rawArgs, argsFound := strings.CutPrefix(input, cmd)
+	return cmd, strings.TrimSpace(rawArgs), argsFound
+}
+
+func exitCommand[T string | int](arg T) {
+	exitCode := 1
+	switch argVal := any(arg).(type) {
+	case string:
+		if argCode, err := strconv.Atoi(argVal); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: Invalid syntax. Using default exit code 1\n")
+		} else {
+			exitCode = argCode
+		}
+	case int:
+		os.Exit(argVal)
+	default:
+		fmt.Fprintf(os.Stderr, "Error: Unsupported type. Using default exit code 1\n")
 	}
 	os.Exit(exitCode)
 }
@@ -67,22 +73,49 @@ func echoCommand(args string) {
 }
 
 func typeCommand(args string) {
-	commandTypes := map[string]string{
-		"echo": "builtin",
-		"exit": "builtin",
-		"type": "builtin",
+	builtin := map[string]struct{}{
+		"echo": {},
+		"exit": {},
+		"type": {},
 	}
+	if _, exists := builtin[args]; exists {
+		fmt.Printf("%s is a shell builtin\n", args)
+		return
+	}
+	if fullPath, found := typeCheckExecutables(args); found {
+		fmt.Printf("%s is %s\n", args, fullPath)
+		return
+	}
+	fmt.Fprintf(os.Stderr, "%s: not found\n", args)
+}
 
-	inputType, exists := commandTypes[args]
-	var inputDescription string
+func typeCheckExecutables(args string) (string, bool) {
+	pathEnv := os.Getenv("PATH")
+	pathEntries := strings.Split(pathEnv, ":")
 
-	if exists {
-		switch inputType {
-		case "builtin":
-			inputDescription = " is a shell builtin"
+	for _, dir := range pathEntries {
+		dirContents, err := os.ReadDir(dir)
+		if err != nil {
+			if os.IsNotExist(err) {
+				continue
+			}
+			fmt.Fprintf(os.Stderr, "Error: Unable to access or read PATH directory %s: %v\n", dir, err)
+			continue
 		}
-	} else {
-		inputDescription = ": not found"
+
+		for _, dirEntry := range dirContents {
+			if dirEntry.Name() == args {
+				fullPath := filepath.Join(dir, dirEntry.Name())
+				dirEntryInfo, err := dirEntry.Info()
+				if err != nil {
+					fmt.Fprintf(os.Stderr, "Error: Unable to retrieve file info for %s: %v\n", dirEntry.Name(), err)
+					return "", false
+				}
+				if dirEntryInfo.Mode()&0111 != 0 {
+					return fullPath, true
+				}
+			}
+		}
 	}
-	fmt.Fprintf(os.Stdout, "%s%s\n", args, inputDescription)
+	return "", false
 }
