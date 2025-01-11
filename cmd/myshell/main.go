@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -39,7 +40,11 @@ func main() {
 		case "type":
 			typeCommand(args)
 		default:
-			fmt.Fprintf(os.Stderr, "%s: command not found\n", cmd)
+			if cmdPath, cmdExists := checkExecutables(args); cmdExists {
+				execProgram(cmdPath, args)
+			} else {
+				fmt.Fprintf(os.Stderr, "%s: command not found\n", cmd)
+			}
 		}
 	}
 }
@@ -82,14 +87,22 @@ func typeCommand(args string) {
 		fmt.Printf("%s is a shell builtin\n", args)
 		return
 	}
-	if fullPath, found := typeCheckExecutables(args); found {
+	if fullPath, found := checkExecutables(args); found {
 		fmt.Printf("%s is %s\n", args, fullPath)
 		return
 	}
 	fmt.Fprintf(os.Stderr, "%s: not found\n", args)
 }
 
-func typeCheckExecutables(args string) (string, bool) {
+func checkExecutables(args string) (string, bool) {
+	// cmdPath, err := exec.LookPath(args)
+	// if err != nil {
+	//   fmt.Fprintf(os.Stderr, "Error: Unable to locate executable on PATH: %v\n", err)
+	//   return "", false
+	// }
+	// fullPath := filepath.Join(cmdPath, args)
+	// return fullPath, true
+
 	pathEnv := os.Getenv("PATH")
 	pathEntries := strings.Split(pathEnv, ":")
 
@@ -118,4 +131,8 @@ func typeCheckExecutables(args string) (string, bool) {
 		}
 	}
 	return "", false
+}
+
+func execProgram(cmdPath string, args string) {
+	exec.Command(cmdPath, args)
 }
