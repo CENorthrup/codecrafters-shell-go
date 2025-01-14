@@ -32,10 +32,9 @@ func main() {
 			runBuiltinCommand(cmd, args, argsExist)
 			// TODO: add alias case
 		case "executable":
-
 			runExternalProgram(cmd, args)
 		default:
-			fmt.Fprintf(os.Stderr, "%s: command not found\n", cmd)
+			fmt.Fprintf(os.Stderr, "%s: not found\n", cmd)
 		}
 	}
 }
@@ -51,12 +50,7 @@ func parseArgs(cmd string, input string) (args string, argsExist bool) {
 }
 
 func checkCmdType(cmd string) (cmdType string, cmdArgs string) {
-	builtin := map[string]struct{}{
-		"echo": {},
-		"exit": {},
-		"type": {},
-	}
-	if _, exists := builtin[cmd]; exists {
+	if checkBuiltin(cmd) {
 		return "builtin", ""
 	}
 	if cmdPath := checkExecutable(cmd); cmdPath != "" {
@@ -65,9 +59,18 @@ func checkCmdType(cmd string) (cmdType string, cmdArgs string) {
 	return "", ""
 }
 
+func checkBuiltin(cmd string) bool {
+	builtin := map[string]struct{}{
+		"echo": {},
+		"exit": {},
+		"type": {},
+	}
+	_, exists := builtin[cmd]
+	return exists
+}
+
 func checkExecutable(args string) string {
 	if cmdPath, err := exec.LookPath(args); err != nil {
-		fmt.Fprintf(os.Stderr, "%s: not found\n", args)
 		return ""
 	} else {
 		return cmdPath
@@ -76,24 +79,19 @@ func checkExecutable(args string) string {
 
 func runExternalProgram(cmd string, args string) {
 	argSlice := strings.Fields(args)
-	fmt.Fprintf(os.Stderr, "Program was passed %d args (including program name).\n", len(argSlice)+1)
-	fmt.Fprintf(os.Stderr, "Arg #0 (program name): %s\n", cmd)
-	for i, arg := range argSlice {
-		fmt.Fprintf(os.Stderr, "Arg #%d: %s\n", i+1, arg)
-	}
 	cmdPath := checkExecutable(cmd)
 	if cmdPath == "" {
 		fmt.Fprintf(os.Stderr, "Error: Path to command: %s not found", cmd)
 		return
 	}
-	command := exec.Command(cmdPath, argSlice...)
+	command := exec.Command(cmd, argSlice...)
+	command.Stderr = os.Stderr
+	command.Stdout = os.Stdout
 
-	out, err := command.Output()
+	err := command.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Unable to run program: %s\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "Error: Command finished with error: %s", err)
 	}
-	fmt.Fprintf(os.Stdout, "Program Signature: %s\n", strings.TrimSpace(string(out)))
 }
 
 func runBuiltinCommand(cmd string, args string, argsExist bool) {
@@ -109,6 +107,8 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 		echoCommand(args)
 	case "type":
 		typeCommand(args)
+	default:
+		return
 	}
 }
 
@@ -141,5 +141,7 @@ func typeCommand(cmd string) {
 		// TODO: add alias case
 	case "executable":
 		fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, cmdArgs)
+	default:
+		fmt.Fprintf(os.Stderr, "%s: not found\n", cmd)
 	}
 }
