@@ -63,16 +63,17 @@ func checkCmdType(cmd string) (cmdType string, cmdArgs string) {
 
 func checkBuiltin(cmd string) bool {
 	builtin := map[string]struct{}{
+		"cd":   {},
 		"echo": {},
 		"exit": {},
-		"type": {},
 		"pwd":  {},
-		// TODO: add alias
-		// TODO: add cd
+		"type": {},
 	}
 	_, exists := builtin[cmd]
 	return exists
 }
+
+// TODO: add alias
 
 func checkExecutable(args string) string {
 	cmdPath, err := exec.LookPath(args)
@@ -101,6 +102,8 @@ func runExternalProgram(cmd string, args string) {
 
 func runBuiltinCommand(cmd string, args string, argsExist bool) {
 	switch cmd {
+	case "cd":
+		cdCommand(args)
 	case "exit":
 		if argsExist {
 			exitCommand(args)
@@ -120,7 +123,14 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 }
 
 // TODO: add aliasCommand()
-// TODO: ad cdCommand()
+
+func cdCommand(args string) {
+	err := os.Chdir(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", args)
+		// fmt.Fprintf(os.Stderr, "Error: Unable to change directory %s\n", err)
+	}
+}
 
 func echoCommand(args string) {
 	fmt.Fprintln(os.Stdout, args)
@@ -147,6 +157,7 @@ func pwdCommand() {
 	pwd, err := os.Getwd()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Unable to get present working directory %s\n", err)
+		return
 	}
 	fmt.Fprintln(os.Stdout, pwd)
 }
