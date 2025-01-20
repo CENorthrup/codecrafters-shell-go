@@ -125,7 +125,14 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 // TODO: add aliasCommand()
 
 func cdCommand(args string) {
-	err := os.Chdir(args)
+	cdPath := args
+	if args == "~" {
+		if cdPath = os.Getenv("HOME"); cdPath == "" {
+			fmt.Fprint(os.Stderr, "Error: $HOME not set.\n")
+			return
+		}
+	}
+	err := os.Chdir(cdPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", args)
 		// fmt.Fprintf(os.Stderr, "Error: Unable to change directory %s\n", err)
