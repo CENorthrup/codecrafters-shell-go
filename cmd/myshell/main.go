@@ -9,6 +9,8 @@ import (
 	"strings"
 )
 
+const errDefaultExitCode string = "Using default exit code 1"
+
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -28,9 +30,9 @@ func main() {
 		args, argsExist := parseArgs(cmd, input)
 
 		switch cmdType, _ := checkCmdType(cmd); cmdType {
+		// TODO: add alias case
 		case "builtin":
 			runBuiltinCommand(cmd, args, argsExist)
-			// TODO: add alias case
 		case "executable":
 			runExternalProgram(cmd, args)
 		default:
@@ -64,17 +66,20 @@ func checkBuiltin(cmd string) bool {
 		"echo": {},
 		"exit": {},
 		"type": {},
+		"pwd":  {},
+		// TODO: add alias
+		// TODO: add cd
 	}
 	_, exists := builtin[cmd]
 	return exists
 }
 
 func checkExecutable(args string) string {
-	if cmdPath, err := exec.LookPath(args); err != nil {
+	cmdPath, err := exec.LookPath(args)
+	if err != nil {
 		return ""
-	} else {
-		return cmdPath
 	}
+	return cmdPath
 }
 
 func runExternalProgram(cmd string, args string) {
@@ -100,19 +105,23 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 		if argsExist {
 			exitCommand(args)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: No exit code provided. Using default exit code 1\n")
+			fmt.Fprintf(os.Stderr, "Error: No exit code provided. %s\n", errDefaultExitCode)
 			exitCommand(1)
 		}
 	case "echo":
 		echoCommand(args)
 	case "type":
 		typeCommand(args)
+	case "pwd":
+		pwdCommand()
 	default:
 		return
 	}
 }
 
 // TODO: add aliasCommand()
+// TODO: ad cdCommand()
+
 func echoCommand(args string) {
 	fmt.Fprintln(os.Stdout, args)
 }
@@ -122,16 +131,24 @@ func exitCommand[T string | int](arg T) {
 	switch argVal := any(arg).(type) {
 	case string:
 		if argCode, err := strconv.Atoi(argVal); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid syntax. Using default exit code 1\n")
+			fmt.Fprintf(os.Stderr, "Error: Invalid syntax. %s\n", errDefaultExitCode)
 		} else {
 			exitCode = argCode
 		}
 	case int:
 		os.Exit(argVal)
 	default:
-		fmt.Fprintf(os.Stderr, "Error: Unsupported type. Using default exit code 1\n")
+		fmt.Fprintf(os.Stderr, "Error: Unsupported type. %s\n", errDefaultExitCode)
 	}
 	os.Exit(exitCode)
+}
+
+func pwdCommand() {
+	pwd, err := os.Getwd()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: Unable to get present working directory %s\n", err)
+	}
+	fmt.Fprintln(os.Stdout, pwd)
 }
 
 func typeCommand(cmd string) {
