@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
+
+	"github.com/codecrafters-io/shell-starter-go/cmd/myshell/builtin"
+	"github.com/codecrafters-io/shell-starter-go/cmd/myshell/utils"
 )
 
 const errDefaultExitCode string = "Using default exit code 1"
@@ -19,17 +21,17 @@ func main() {
 		input, err := reader.ReadString('\n')
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error: Unable to read input:%v\n", err)
-			exitCommand(1)
+			os.Exit(1)
 		}
 		input = strings.TrimSpace(input)
 		if input == "" {
 			continue
 		}
 
-		cmd := parseCommand(input)
-		args, argsExist := parseArgs(cmd, input)
+		cmd := utils.ParseCommand(input)
+		args, argsExist := utils.ParseArgs(cmd, input)
 
-		switch cmdType, _ := checkCmdType(cmd); cmdType {
+		switch cmdType, _ := utils.CheckCmdType(cmd); cmdType {
 		// TODO: add alias case
 		case "builtin":
 			runBuiltinCommand(cmd, args, argsExist)
@@ -41,51 +43,33 @@ func main() {
 	}
 }
 
-func parseCommand(input string) string {
-	inputParts := strings.Fields(input)
-	return inputParts[0]
-}
-
-func parseArgs(cmd string, input string) (args string, argsExist bool) {
-	rawArgs, argsFound := strings.CutPrefix(input, cmd)
-	return strings.TrimSpace(rawArgs), argsFound
-}
-
-func checkCmdType(cmd string) (cmdType string, cmdArgs string) {
-	if checkBuiltin(cmd) {
-		return "builtin", ""
+func runBuiltinCommand(cmd string, args string, argsExist bool) {
+	switch cmd {
+	case "cd":
+		builtin.Cd(args)
+	case "exit":
+		if argsExist {
+			builtin.Exit(args)
+		} else {
+			fmt.Fprintf(os.Stderr, "Error: No exit code provided. %s\n", errDefaultExitCode)
+			builtin.Exit(1)
+		}
+	case "echo":
+		builtin.Echo(args)
+	case "type":
+		builtin.Type(args)
+	case "pwd":
+		builtin.Pwd()
+	default:
+		return
 	}
-	if cmdPath := checkExecutable(cmd); cmdPath != "" {
-		return "executable", cmdPath
-	}
-	return "", ""
 }
 
-func checkBuiltin(cmd string) bool {
-	builtin := map[string]struct{}{
-		"cd":   {},
-		"echo": {},
-		"exit": {},
-		"pwd":  {},
-		"type": {},
-	}
-	_, exists := builtin[cmd]
-	return exists
-}
-
-// TODO: add alias
-
-func checkExecutable(args string) string {
-	cmdPath, err := exec.LookPath(args)
-	if err != nil {
-		return ""
-	}
-	return cmdPath
-}
+// TODO: add runAliasCommand()
 
 func runExternalProgram(cmd string, args string) {
 	argSlice := strings.Fields(args)
-	cmdPath := checkExecutable(cmd)
+	cmdPath := utils.CheckExecutable(cmd)
 	if cmdPath == "" {
 		fmt.Fprintf(os.Stderr, "Error: Path to command: %s not found", cmd)
 		return
@@ -97,86 +81,5 @@ func runExternalProgram(cmd string, args string) {
 	err := command.Run()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error: Command finished with error: %s", err)
-	}
-}
-
-func runBuiltinCommand(cmd string, args string, argsExist bool) {
-	switch cmd {
-	case "cd":
-		cdCommand(args)
-	case "exit":
-		if argsExist {
-			exitCommand(args)
-		} else {
-			fmt.Fprintf(os.Stderr, "Error: No exit code provided. %s\n", errDefaultExitCode)
-			exitCommand(1)
-		}
-	case "echo":
-		echoCommand(args)
-	case "type":
-		typeCommand(args)
-	case "pwd":
-		pwdCommand()
-	default:
-		return
-	}
-}
-
-// TODO: add aliasCommand()
-
-func cdCommand(args string) {
-	cdPath := args
-	if args == "~" {
-		if cdPath = os.Getenv("HOME"); cdPath == "" {
-			fmt.Fprint(os.Stderr, "Error: $HOME not set.\n")
-			return
-		}
-	}
-	err := os.Chdir(cdPath)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "cd: %s: No such file or directory\n", args)
-		// fmt.Fprintf(os.Stderr, "Error: Unable to change directory %s\n", err)
-	}
-}
-
-func echoCommand(args string) {
-	fmt.Fprintln(os.Stdout, args)
-}
-
-func exitCommand[T string | int](arg T) {
-	exitCode := 1
-	switch argVal := any(arg).(type) {
-	case string:
-		if argCode, err := strconv.Atoi(argVal); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: Invalid syntax. %s\n", errDefaultExitCode)
-		} else {
-			exitCode = argCode
-		}
-	case int:
-		os.Exit(argVal)
-	default:
-		fmt.Fprintf(os.Stderr, "Error: Unsupported type. %s\n", errDefaultExitCode)
-	}
-	os.Exit(exitCode)
-}
-
-func pwdCommand() {
-	pwd, err := os.Getwd()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Unable to get present working directory %s\n", err)
-		return
-	}
-	fmt.Fprintln(os.Stdout, pwd)
-}
-
-func typeCommand(cmd string) {
-	switch cmdType, cmdArgs := checkCmdType(cmd); cmdType {
-	case "builtin":
-		fmt.Fprintf(os.Stdout, "%s is a shell builtin\n", cmd)
-		// TODO: add alias case
-	case "executable":
-		fmt.Fprintf(os.Stdout, "%s is %s\n", cmd, cmdArgs)
-	default:
-		fmt.Fprintf(os.Stderr, "%s: not found\n", cmd)
 	}
 }
