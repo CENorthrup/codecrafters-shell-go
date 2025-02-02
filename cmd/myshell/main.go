@@ -11,8 +11,6 @@ import (
 	"github.com/codecrafters-io/shell-starter-go/cmd/myshell/utils"
 )
 
-const errDefaultExitCode string = "Using default exit code 1"
-
 func main() {
 	reader := bufio.NewReader(os.Stdin)
 
@@ -28,8 +26,7 @@ func main() {
 			continue
 		}
 
-		cmd := utils.ParseCommand(input)
-		args, argsExist := utils.ParseArgs(cmd, input)
+		cmd, args, argsExist := utils.TokenizeInput(input)
 
 		switch cmdType, _ := utils.CheckCmdType(cmd); cmdType {
 		// TODO: add alias case
@@ -51,7 +48,6 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 		if argsExist {
 			builtin.Exit(args)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: No exit code provided. %s\n", errDefaultExitCode)
 			builtin.Exit(1)
 		}
 	case "echo":
@@ -68,13 +64,13 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 // TODO: add runAliasCommand()
 
 func runExternalProgram(cmd string, args string) {
-	argSlice := strings.Fields(args)
 	cmdPath := utils.CheckExecutable(cmd)
 	if cmdPath == "" {
 		fmt.Fprintf(os.Stderr, "Error: Path to command: %s not found", cmd)
 		return
 	}
-	command := exec.Command(cmd, argSlice...)
+
+	command := exec.Command(cmd, args)
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stdout
 
