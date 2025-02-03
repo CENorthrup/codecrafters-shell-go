@@ -31,7 +31,7 @@ func main() {
 		switch cmdType, _ := utils.CheckCmdType(cmd); cmdType {
 		// TODO: add alias case
 		case "builtin":
-			runBuiltinCommand(cmd, args, argsExist)
+			runBuiltinCommand(cmd, utils.SliceToString(args), argsExist)
 		case "executable":
 			runExternalProgram(cmd, args)
 		default:
@@ -63,19 +63,19 @@ func runBuiltinCommand(cmd string, args string, argsExist bool) {
 
 // TODO: add runAliasCommand()
 
-func runExternalProgram(cmd string, args string) {
+func runExternalProgram(cmd string, args []string) {
 	cmdPath := utils.CheckExecutable(cmd)
 	if cmdPath == "" {
 		fmt.Fprintf(os.Stderr, "Error: Path to command: %s not found", cmd)
 		return
 	}
 
-	command := exec.Command(cmd, args)
+	command := exec.Command(cmd, args...)
 	command.Stderr = os.Stderr
 	command.Stdout = os.Stdout
 
 	err := command.Run()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: Command finished with error: %s", err)
+		fmt.Fprintf(os.Stderr, "Error: Command finished with error: %s\n", err)
 	}
 }

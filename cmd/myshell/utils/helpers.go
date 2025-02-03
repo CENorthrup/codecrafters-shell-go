@@ -6,22 +6,19 @@ import (
 	"strings"
 )
 
-func TokenizeInput(input string) (cmd string, args string, argsExist bool) {
+func TokenizeInput(input string) (cmd string, args []string, argsExist bool) {
 	// Break out the input into a slice... this is only used to get the command in the next step
 	inputParts := strings.Fields(input)
+	var parsedArgs []string
 
 	// Since the first 'part'  of the input needs to be the command...
 	// ... we can strip it out of the input and are left with the args.
-
 	rawArgs, _ := strings.CutPrefix(input, inputParts[0])
+	// Handle trailing space
 	rawArgs = strings.TrimSpace(rawArgs)
-
 	argsFound := rawArgs != ""
 
-	var argsString string
-
 	if argsFound {
-		var parsedArgs []string
 
 		regex := regexp.MustCompile(`'([^']*)'|\S+`)
 		matches := regex.FindAllStringSubmatch(rawArgs, -1)
@@ -55,32 +52,29 @@ func TokenizeInput(input string) (cmd string, args string, argsExist bool) {
 					} else {
 						// if the current and next strings ARE NOT adjacent...
 						// ... add the current buffer to parsedArgs and flush
-						parsedArgs = append(parsedArgs, "'"+buffer.String()+"'")
+						parsedArgs = append(parsedArgs, buffer.String())
 						buffer.Reset()
 					}
 				} else {
 					// If we are either at the end of the slice...
 					// ... or the next match isn't quoted...
 					// ... add the current buffer to parsedArgs and flush
-					parsedArgs = append(parsedArgs, "'"+buffer.String()+"'")
+					parsedArgs = append(parsedArgs, buffer.String())
 					buffer.Reset()
 				}
 			} else {
 				// If this is a non quoted string...
 				// ... add the current buffer to parsedArgs and flush
 				if buffer.Len() > 0 {
-					parsedArgs = append(parsedArgs, "'"+buffer.String()+"'")
+					parsedArgs = append(parsedArgs, buffer.String())
 					buffer.Reset()
 				}
 				// ... then we can add this unquoted string to parsedArgs
 				parsedArgs = append(parsedArgs, match[0])
 			}
 		}
-		// Lastly we join all the parsed args, separated by a space
-		argsString = strings.Join(parsedArgs, " ")
 	}
-	return inputParts[0], strings.TrimSpace(argsString), argsFound
-	// return inputParts[0], parsedArgs, argsFound
+	return inputParts[0], parsedArgs, argsFound
 }
 
 func CheckCmdType(cmd string) (cmdType string, cmdArgs string) {
@@ -115,8 +109,7 @@ func CheckExecutable(args string) string {
 	return cmdPath
 }
 
-func StripQuotes(s string) string {
-	s = strings.ReplaceAll(s, "'", "")
-	s = strings.ReplaceAll(s, "\"", "")
-	return s
+func SliceToString(slice []string) string {
+	sliceString := strings.TrimSpace(strings.Join(slice, " "))
+	return sliceString
 }
